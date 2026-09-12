@@ -1,0 +1,11 @@
+# Runtime lives outside the repo, but guard against a stray copy landing here.
+bin/
+models/
+logs/
+voices/
+.venv/
+*.gguf
+*.wav
+*.zip
+__pycache__/
+*.pyc
