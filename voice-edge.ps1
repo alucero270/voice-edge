@@ -276,6 +276,10 @@ $env:VOICE_AGENT_TTS_CONSENT = $Consent
 $env:VOICE_AGENT_TTS_SPEED   = "$Speed"
 $env:VOICE_AGENT_SYSTEM_PROMPT = $SystemPrompt
 $env:VOICE_AGENT_MAX_TOKENS    = "$MaxTokens"
+# Pipecat's dev-runner banner prints box-drawing characters. With stdout
+# redirected to a log file, Windows Python can default to cp1252, the print
+# raises UnicodeEncodeError, and the bot exits before serving /client/.
+$env:PYTHONUTF8                = '1'
 
 Write-Host "Warming $Model on llama-swap (cold load takes ~20s) ..."
 $warm = @{ model=$Model; messages=@(@{ role='user'; content='ping' }); max_tokens=8 } | ConvertTo-Json -Compress -Depth 4
@@ -283,7 +287,17 @@ try {
     Invoke-RestMethod -Uri "$LlamaSwapUrl/chat/completions" -Method POST -Body $warm `
         -ContentType 'application/json' -Headers @{ Authorization = "Bearer $LlamaSwapKey" } -TimeoutSec 600 | Out-Null
     Write-Host '  llm ready'
-} catch { Write-Warning "LLM warm failed: $($_.Exception.Message). The first spoken turn will be slow." }
+} catch {
+    # A slow or cold model only delays the first reply, but a rejected key
+    # fails every turn while STT keeps transcribing, so the bot looks alive
+    # and never answers. Stop here instead of starting a mute bot.
+    $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+    if ($status -eq 401 -or $status -eq 403) {
+        Stop-Servers
+        throw "llama-swap rejected the API key (HTTP $status). Check -LlamaSwapKey."
+    }
+    Write-Warning "LLM warm failed: $($_.Exception.Message). The first spoken turn will be slow."
+}
 
 Write-Host "Starting Pipecat on $BotPort ..."
 Push-Location $Pipecat
