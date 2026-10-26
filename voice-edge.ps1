@@ -37,9 +37,9 @@
   extension. Default: tester
 
 .EXAMPLE
-  .\nomad-voice-stack.ps1 -Bootstrap
-  .\nomad-voice-stack.ps1 -Verify
-  .\nomad-voice-stack.ps1 -Voice salesman
+  .\voice-edge.ps1 -Bootstrap
+  .\voice-edge.ps1 -Verify
+  .\voice-edge.ps1 -Voice salesman
 #>
 [CmdletBinding()]
 param(
@@ -257,7 +257,7 @@ if ($SpeechOnly) {
     Write-Host "  VOICE_AGENT_TTS_API = http://127.0.0.1:$TtsPort/v1"
     Write-Host "  LLAMA_SWAP_URL      = $LlamaSwapUrl"
     Write-Host ''
-    Write-Host "Stop with: .\nomad-voice-stack.ps1 -Stop"
+    Write-Host "Stop with: .\voice-edge.ps1 -Stop"
     return
 }
 
@@ -321,4 +321,4 @@ Write-Host "  open   http://localhost:$BotPort/client/"
 Write-Host "  speech local, LLM on $LlamaSwapUrl ($Model)"
 Write-Host "  logs   $Logs\*_$stamp.*"
 Write-Host ''
-Write-Host "Stop with: .\nomad-voice-stack.ps1 -Stop"
+Write-Host "Stop with: .\voice-edge.ps1 -Stop"
