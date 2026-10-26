@@ -66,6 +66,14 @@ VOICE_AGENT_SYSTEM_PROMPT = os.getenv(
         "Do not mention reasoning, plans, markdown, or hidden thoughts."
     ),
 )
+# The supervisor passes the prompt as a file: a Windows environment variable
+# tops out at 32,767 characters, and profile plus session material can exceed
+# that. The file wins when both are set. A missing file is an error, not a
+# silent fallback to the default prompt.
+_SYSTEM_PROMPT_FILE = os.getenv("VOICE_AGENT_SYSTEM_PROMPT_FILE", "").strip()
+if _SYSTEM_PROMPT_FILE:
+    with open(_SYSTEM_PROMPT_FILE, encoding="utf-8") as _f:
+        VOICE_AGENT_SYSTEM_PROMPT = _f.read()
 VOICE_AGENT_MIN_INTERRUPT_WORDS = int(os.getenv("VOICE_AGENT_MIN_INTERRUPT_WORDS", "3"))
 # CrispASR requires a consent attestation on every /v1/audio/speech request that
 # uses a cloned voice, regardless of server-side --i-have-rights. Pipecat's
@@ -170,10 +178,17 @@ class _ControlHandler(BaseHTTPRequestHandler):
         pass
 
 
+class _ControlServer(HTTPServer):
+    # HTTPServer sets SO_REUSEADDR, and on Windows that lets a second bot bind
+    # a port a stale one still holds, so both run and the old one may keep
+    # answering. Off, the second bind fails and the new bot exits loudly.
+    allow_reuse_address = False
+
+
 def _start_control_server() -> None:
     if VOICE_AGENT_CONTROL_PORT <= 0:
         return
-    server = HTTPServer(("127.0.0.1", VOICE_AGENT_CONTROL_PORT), _ControlHandler)
+    server = _ControlServer(("127.0.0.1", VOICE_AGENT_CONTROL_PORT), _ControlHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     logger.info("control server on 127.0.0.1:{}", VOICE_AGENT_CONTROL_PORT)
 

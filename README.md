@@ -63,6 +63,28 @@ Then put a reference voice in `%USERPROFILE%\stacks\voice-edge\voices\chatterbox
 
 Open **http://localhost:7860/client/** and press Connect.
 
+## Dashboard
+
+```powershell
+.\voice-edge.ps1 -Shortcut     # puts "Voice Edge" on the desktop
+```
+
+The shortcut runs `supervisor.py`, which opens a console window and a dashboard at **http://127.0.0.1:7870/**. Pick a profile, optionally paste or load session material, and press Start. The dashboard shows every process, its PID, which PID actually holds each port, health, uptime, logs, and whether llama-swap is reachable and offers the model.
+
+**The console window is the instance.** The supervisor puts itself in a Windows Job Object that kills its members when it exits, and every process it starts inherits that. Closing the window, Ctrl+C, the Shut down button, or a crash all take STT, TTS and the bot down with it. Clicking the shortcut again while it is running just reopens the dashboard.
+
+Anything holding a voice-edge port that the supervisor did not start shows up under **Strays**, typically a leftover from a launcher run, and can be stopped from there.
+
+### Profiles and session material
+
+A **profile** is who the agent is: a TOML file in `profiles/` with a system prompt, an opening line, and optionally its own voice, model and token budget. A new use case is a new file, not a new script. `profiles/_spoken.txt` is prepended to every profile; it holds the rules that come from speaking aloud rather than from the role.
+
+**Session material** is what you are working on today, such as a resume or an assignment. It is pasted into the dashboard per session, appended to the prompt as reference text, and capped at 60,000 characters. The composed prompt is written to `logs\prompt_<time>.txt` so you can read exactly what the model got.
+
+Changing profile restarts only the bot. The speech servers stay loaded, so it takes seconds; reconnect the voice client afterwards.
+
+Machine settings such as the llama-swap URL, ports and default voice go in `stack.toml`; see `stack.example.toml`.
+
 ## Usage
 
 ```powershell

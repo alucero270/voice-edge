@@ -1,0 +1,25 @@
+# Machine settings for supervisor.py. Copy to stack.toml (gitignored) and keep
+# only the keys you change. Precedence, highest first: profile, stack.toml,
+# environment (LLAMA_SWAP_URL, LLAMA_SWAP_KEY), built-in defaults.
+
+# llama_swap_url = "http://your-llama-swap-host:8085/v1"
+# llama_swap_key = "LOCAL"
+# base           = "C:/Users/you/stacks/voice-edge"
+
+# Ports. The dashboard is always 127.0.0.1.
+# dashboard_port = 7870
+# bot_port       = 7860
+# control_port   = 7861
+# stt_port       = 8002
+# tts_port       = 8003
+
+# 127.0.0.1 by default. The browser grants the microphone only on localhost or
+# https, so 0.0.0.0 exposes the bot without making it usable from a phone.
+# bot_host = "127.0.0.1"
+
+# Defaults for profiles that do not set their own.
+# voice       = "tester"
+# model       = "gemma-4-26b-a4b-it-qat-co"
+# speed       = 0.92
+# max_tokens  = 400
+# temperature = 0.35

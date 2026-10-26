@@ -9,3 +9,6 @@ voices/
 *.zip
 __pycache__/
 *.pyc
+
+# Machine-specific supervisor settings
+stack.toml

@@ -32,6 +32,10 @@
 .PARAMETER Stop
   Stop any running CrispASR servers started by this script.
 
+.PARAMETER Shortcut
+  Create a desktop shortcut that opens supervisor.py, the dashboard that owns
+  the processes. Closing its console window stops everything it started.
+
 .PARAMETER Voice
   Reference voice name. Must match a file in voices\chatterbox\ with NO
   extension. Default: tester
@@ -47,6 +51,7 @@ param(
     [switch]$Verify,
     [switch]$Stop,
     [switch]$SpeechOnly,
+    [switch]$Shortcut,
     [string]$Voice = 'tester',
     [string]$Model = 'gemma-4-26b-a4b-it-qat-co',
     [string]$LlamaSwapUrl = $(if ($env:LLAMA_SWAP_URL) { $env:LLAMA_SWAP_URL } else { 'http://localhost:8085/v1' }),
@@ -216,6 +221,22 @@ function Start-Servers {
 
 if ($Stop)      { Stop-Servers; Write-Host 'stopped'; return }
 if ($Bootstrap) { Invoke-Bootstrap; return }
+
+if ($Shortcut) {
+    $py = Join-Path $Pipecat '.venv\Scripts\python.exe'
+    if (-not (Test-Path $py)) { throw "Pipecat venv missing at $py. Run with -Bootstrap." }
+    # python.exe, not pythonw.exe: the console window is the visible sign that
+    # the stack is up, and closing it is how you stop it.
+    $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Voice Edge.lnk'
+    $s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+    $s.TargetPath       = $py
+    $s.Arguments        = "`"$PSScriptRoot\supervisor.py`""
+    $s.WorkingDirectory = $PSScriptRoot
+    $s.Description      = 'voice-edge supervisor and dashboard'
+    $s.Save()
+    Write-Host "created $lnk"
+    return
+}
 
 $stamp = Start-Servers
 

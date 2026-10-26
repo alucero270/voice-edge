@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>voice-edge</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --text: #1b1f24; --muted: #5f6b7a; --line: #dde2e8;
+    --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --idle: #6e7781; --accent: #0969da;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #8b949e; --line: #30363d;
+      --ok: #3fb950; --warn: #d29922; --bad: #f85149; --idle: #8b949e; --accent: #4493f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); font-weight: 600; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+  .healthy .dot, .running .dot { background: var(--ok); }
+  .starting .dot, .busy .dot, .unhealthy .dot { background: var(--warn); }
+  .exited .dot, .error .dot { background: var(--bad); }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  label { display: block; font-weight: 600; margin: 10px 0 4px; }
+  select, textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  textarea { min-height: 140px; resize: vertical; font-family: var(--mono); font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  button { font: inherit; font-weight: 600; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  pre { margin: 0; max-height: 320px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .banner { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--bad); color: var(--bad); white-space: pre-wrap; }
+  .banner.warn { border-color: var(--warn); color: var(--warn); }
+  .events div { font-family: var(--mono); font-size: 12px; }
+  .events .error { color: var(--bad); } .events .warn { color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>voice-edge</h1>
+    <span id="overall" class="pill"><span class="dot"></span><span id="overall-text">connecting</span></span>
+    <span class="muted mono" id="sup"></span>
+    <span class="muted" style="margin-left:auto">Closing the supervisor window stops everything.</span>
+  </header>
+
+  <div id="error" class="banner" hidden></div>
+  <div id="dead" class="banner" hidden>Supervisor is not running. You can close this tab.</div>
+
+  <div class="grid">
+    <section>
+      <h2>Session</h2>
+      <label for="profile">Profile</label>
+      <select id="profile"></select>
+      <div id="profile-desc" class="muted" style="margin-top:4px"></div>
+      <div id="profile-meta" class="muted mono"></div>
+      <div id="profile-errors" class="banner warn" style="margin-top:8px" hidden></div>
+
+      <label for="material">Session material <span class="muted" style="font-weight:400">(optional)</span></label>
+      <textarea id="material" spellcheck="false"></textarea>
+      <div class="row">
+        <input type="file" id="file" accept=".txt,.md,.markdown,.text,.csv,.json" hidden>
+        <button id="load">Load text file...</button>
+        <button id="clear">Clear</button>
+        <span id="count" class="muted mono"></span>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button id="start" class="primary">Start</button>
+        <button id="stop">Stop</button>
+        <a id="client" href="#" target="_blank" rel="noopener" hidden>Open voice client</a>
+      </div>
+      <div id="session" class="muted mono" style="margin-top:8px"></div>
+    </section>
+
+    <section>
+      <h2>LLM</h2>
+      <div id="llm"></div>
+      <h2 style="margin-top:16px">Events</h2>
+      <div id="events" class="events"></div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Processes</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Component</th><th>State</th><th>PID</th><th>Ports (listener pid)</th><th>Uptime</th><th></th></tr></thead>
+      <tbody id="components"></tbody>
+    </table></div>
+  </section>
+
+  <section id="strays-box" hidden>
+    <h2>Strays</h2>
+    <p class="muted" style="margin-top:0">These processes hold voice-edge ports but were not started by this supervisor, usually leftovers from a launcher run.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Port</th><th>Role</th><th>PID</th><th>Bind</th><th>Image</th></tr></thead>
+      <tbody id="strays"></tbody>
+    </table></div>
+    <div class="row"><button id="kill-strays" class="danger">Stop strays</button></div>
+  </section>
+
+  <section>
+    <h2>Log <span id="log-name" class="mono"></span></h2>
+    <pre id="log">Pick a component's log above.</pre>
+  </section>
+
+  <div class="row"><button id="shutdown" class="danger">Shut down supervisor</button></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text != null) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+function pill(state, label = state) {
+  const p = el("span", null, "pill " + state);
+  p.append(el("span", null, "dot"), el("span", label));
+  return p;
+}
+function uptime(s) {
+  if (s == null) return "";
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+  return h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`;
+}
+async function post(path, body = {}) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+function showError(msg) { $("error").textContent = msg || ""; $("error").hidden = !msg; }
+
+let profiles = {}, maxChars = 60000, logName = null, last = null;
+
+async function loadProfiles() {
+  const data = await (await fetch("/api/profiles")).json();
+  profiles = data.profiles; maxChars = data.max_material_chars;
+  const sel = $("profile"), keep = sel.value || store.get("profile");
+  sel.replaceChildren(...Object.entries(profiles).map(([id, p]) => {
+    const o = el("option", p.name); o.value = id; return o;
+  }));
+  if (keep && profiles[keep]) sel.value = keep;
+  const errs = Object.values(data.errors);
+  $("profile-errors").textContent = errs.length ? "Profiles that failed to load:\n" + errs.join("\n") : "";
+  $("profile-errors").hidden = !errs.length;
+  onProfile(false);
+}
+function onProfile(fromUser) {
+  const id = $("profile").value, p = profiles[id];
+  if (!p) return;
+  if (fromUser) store.set("profile", id);
+  $("profile-desc").textContent = p.description || "";
+  $("profile-meta").textContent = [p.model && `model ${p.model}`, p.voice && `voice ${p.voice}`].filter(Boolean).join("  ·  ");
+  $("material").placeholder = p.material_hint || "Text the agent should have for this session.";
+  if (fromUser || !$("material").value) $("material").value = store.get("material:" + id) || "";
+  count();
+}
+function count() {
+  const n = $("material").value.length;
+  $("count").textContent = n ? `${n.toLocaleString()} chars, about ${Math.round(n / 4).toLocaleString()} tokens` : "";
+  $("count").style.color = n > maxChars ? "var(--bad)" : "";
+  store.set("material:" + $("profile").value, $("material").value);
+}
+
+function render(s) {
+  last = s;
+  $("dead").hidden = true;
+  $("sup").textContent = `supervisor pid ${s.supervisor.pid}`;
+  const comps = s.components;
+  const allUp = comps.every((c) => c.state === "healthy");
+  const anyBad = comps.some((c) => c.state === "exited" || c.state === "unhealthy");
+  const overall = s.busy ? "busy" : s.last_error ? "error" : allUp ? "running" : anyBad ? "error" : "stopped";
+  $("overall").className = "pill " + overall;
+  $("overall-text").textContent = s.busy ? s.busy + "..." : { running: "running", error: "error", stopped: "stopped" }[overall];
+  showError(s.last_error);
+
+  $("start").disabled = !!s.busy;
+  $("stop").disabled = !!s.busy;
+  $("start").textContent = allUp ? "Restart with this profile" : "Start";
+  $("client").href = s.client_url;
+  $("client").hidden = !allUp;
+  const ses = s.session;
+  $("session").textContent = ses
+    ? `active: ${ses.name} since ${ses.started} · ${ses.model} · ${ses.voice} · material ${ses.material_chars.toLocaleString()} chars\nprompt ${ses.prompt_file}`
+    : "";
+
+  $("components").replaceChildren(...comps.map((c) => {
+    const tr = el("tr");
+    const state = el("td"); state.append(pill(c.state));
+    if (c.exit_code != null) state.append(el("span", ` code ${c.exit_code}`, "muted"));
+    const ports = el("td", null, "mono");
+    for (const p of c.ports) {
+      const owner = p.pid == null ? "free" : p.ours ? `pid ${p.pid}` : `pid ${p.pid}, NOT OURS`;
+      const d = el("div", `${p.label} ${p.bind || "127.0.0.1"}:${p.port} (${owner})`);
+      if (p.pid != null && !p.ours) d.style.color = "var(--bad)";
+      ports.append(d);
+    }
+    const logBtn = el("button", "Log"); logBtn.onclick = () => { logName = c.name; refreshLog(); };
+    const name = el("td"); name.append(el("strong", c.name));
+    if (c.cmd) { const cmd = el("div", c.cmd, "muted mono"); cmd.style.wordBreak = "break-all"; name.append(cmd); }
+    const btn = el("td"); btn.append(logBtn);
+    tr.append(name, state, el("td", c.pid ?? "", "mono"), ports, el("td", uptime(c.uptime_s), "mono"), btn);
+    return tr;
+  }));
+
+  $("strays-box").hidden = !s.strays.length;
+  $("strays").replaceChildren(...s.strays.map((x) => {
+    const tr = el("tr");
+    tr.append(el("td", x.port, "mono"), el("td", x.role), el("td", x.pid, "mono"),
+              el("td", x.bind, "mono"), el("td", x.image + (x.killable ? "" : " (won't kill)"), "mono"));
+    return tr;
+  }));
+
+  const llm = s.llm, box = $("llm");
+  const model = ses ? ses.model : (profiles[$("profile").value] || {}).model;
+  const lines = [el("div", llm.url, "mono")];
+  const st = el("div"); st.append(llm.reachable ? pill("healthy", "reachable") : pill("exited", "down"),
+    el("span", llm.reachable ? ` ${llm.models.length} models offered` : ` unreachable: ${llm.detail}`, "muted"));
+  lines.push(st);
+  if (llm.reachable && model && !llm.models.includes(model)) {
+    lines.push(el("div", `Model "${model}" is not in llama-swap's list.`, "banner warn"));
+  }
+  box.replaceChildren(...lines);
+
+  $("events").replaceChildren(...s.events.map((e) => el("div", `${e.time} ${e.msg}`, e.level)));
+}
+
+async function poll() {
+  try {
+    render(await (await fetch("/api/status")).json());
+  } catch {
+    $("dead").hidden = false;
+    $("overall").className = "pill error"; $("overall-text").textContent = "supervisor gone";
+  }
+  if (logName) refreshLog();
+}
+async function refreshLog() {
+  try {
+    const text = await (await fetch("/api/logs/" + logName)).text();
+    const pre = $("log"), atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+    $("log-name").textContent = logName;
+    pre.textContent = text || "(empty)";
+    if (atBottom) pre.scrollTop = pre.scrollHeight;
+  } catch {}
+}
+
+$("profile").onchange = () => onProfile(true);
+$("material").oninput = count;
+$("load").onclick = () => $("file").click();
+$("clear").onclick = () => { $("material").value = ""; count(); };
+$("file").onchange = async () => {
+  const f = $("file").files[0];
+  if (f) { $("material").value = await f.text(); count(); }
+  $("file").value = "";
+};
+$("start").onclick = async () => {
+  try { showError(""); await post("/api/start", { profile: $("profile").value, material: $("material").value }); }
+  catch (e) { showError(e.message); }
+  poll();
+};
+$("stop").onclick = async () => { try { await post("/api/stop"); } catch (e) { showError(e.message); } poll(); };
+$("kill-strays").onclick = async () => {
+  if (!confirm("Force-kill the processes listed under Strays?")) return;
+  try { await post("/api/kill-strays"); } catch (e) { showError(e.message); }
+  poll();
+};
+$("shutdown").onclick = async () => {
+  if (!confirm("Stop every voice-edge process and exit the supervisor?")) return;
+  try { await post("/api/shutdown"); } catch {}
+};
+window.addEventListener("focus", loadProfiles);  // pick up profile edits made in an editor
+
+loadProfiles().then(poll);
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
